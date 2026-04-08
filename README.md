@@ -1,205 +1,309 @@
-# CS 21 24.2 Project: Arch242
-# Project Details
-This project consists of an Pyxel-based assembler and emulator, snake game using the Arch242 ISA, and a Logisim-based  hardware implementation based on a given custom architeture, Arch 242.
+# CS 21 24.2 Project: Arch-242
 
-- Contributions:
-    - `Lim, Eliana Mari P.`: emulator (part a2), snake game (part a3)
-    - `Ricaforte, Jarelle Gail E.`: snake game (part a3), hardware implementation (part b)
-    - `Sacramento, Gabrielle Denise S.`: hardware implementation (part b)
-    - `Sim, Charlize S.`: assembler (part a1), snake game(part a3)
+A full-stack implementation of the **Arch-242** custom CPU architecture for CS 21 (Computer Organization and Architecture), 2nd Semester AY 2024–2025 at UP Diliman. The Arch-242 architecture and ISA were defined by the course instructors; this repository contains our group's implementation: an assembler, a graphical emulator, a Snake game written in Arch-242 assembly, and a hardware implementation in Logisim Evolution.
 
-# Setup
-- Make sure to have at least Python 3.10, Pyxel, and Logisim Evolution installed.
+## Group Members & Contributions
 
-To access the files in this repository:
-1. Clone this repository or download the ZIP file.
-2. Extract files to desired location
+| Member | Contributions |
+|---|---|
+| Lim, Eliana Mari P. | Emulator (Part A2), Snake Game (Part A3) |
+| Ricaforte, Jarelle Gail E. | Snake Game (Part A3), Hardware Implementation (Part B) |
+| Sacramento, Gabrielle Denise S. | Hardware Implementation (Part B) |
+| Sim, Charlize S. | Assembler (Part A1), Snake Game (Part A3) |
 
-# Part A1: Arch-242 assembler
-## How to Run
-From the root directory, run the following:
+---
+
+## Arch-242 Architecture Overview
+
+Arch-242 is a **Harvard architecture** (separate instruction and data memory) with the following properties:
+
+- **Instruction addresses**: 16-bit wide
+- **Data memory addresses**: 8-bit wide (256 addressable locations)
+- **Instruction width**: 1 or 2 bytes; PC advances by the instruction's width after each execution
+
+### Registers
+
+| Name | Width | Description |
+|---|---|---|
+| RA, RB, RC, RD, RE | 4-bit each | General-purpose registers (indices 0–4) |
+| ACC | 4-bit | Accumulator — destination of most arithmetic and logic operations |
+| CF | 1-bit | Carry/borrow flag, set by arithmetic operations |
+| TEMP | 16-bit | Holds the return address during a `call`; cleared on `ret` |
+| IOA | 4-bit | I/O register; bits 0–3 correspond to Up, Down, Left, Right arrow keys |
+
+### LED Matrix (Memory-Mapped I/O)
+
+Data memory addresses **192–241** are memory-mapped to a **10-row × 20-column** LED matrix display. Only the lower nibble of each byte is used — each bit maps to one LED cell. The upper nibble is ignored.
+
+| Data address | Bits used | Maps to |
+|---|---|---|
+| 192 | bits 0–3 | Row 0, Columns 0–3 |
+| 193 | bits 0–3 | Row 0, Columns 4–7 |
+| … | … | … |
+| 241 | bits 0–3 | Row 9, Columns 16–19 |
+
+---
+
+## Instruction Set Reference
+
+> **Notation:**
+> - `MEM[RB:RA]` — 8-bit data memory address formed as `(RB << 4) | RA`
+> - `MEM[RD:RC]` — 8-bit data memory address formed as `(RD << 4) | RC`
+> - `<imm>` — an integer literal (decimal or `0x`-prefixed hex) or a **label name**
+> - `<reg>` — register index: `0`=RA, `1`=RB, `2`=RC, `3`=RD, `4`=RE
+> - All values are 4-bit (0–15) unless otherwise stated; overflow bits are discarded
+
+### Memory Access
+
+| Instruction | Bytes | Effect |
+|---|---|---|
+| `from-mba` | 1 | `ACC = MEM[RB:RA]` |
+| `to-mba` | 1 | `MEM[RB:RA] = ACC` |
+| `from-mdc` | 1 | `ACC = MEM[RD:RC]` |
+| `to-mdc` | 1 | `MEM[RD:RC] = ACC` |
+| `inc*-mba` | 1 | `MEM[RB:RA] = MEM[RB:RA] + 1` |
+| `dec*-mba` | 1 | `MEM[RB:RA] = MEM[RB:RA] - 1` |
+| `inc*-mdc` | 1 | `MEM[RD:RC] = MEM[RD:RC] + 1` |
+| `dec*-mdc` | 1 | `MEM[RD:RC] = MEM[RD:RC] - 1` |
+| `and*-mba` | 1 | `MEM[RB:RA] = ACC & MEM[RB:RA]` |
+| `xor*-mba` | 1 | `MEM[RB:RA] = ACC ^ MEM[RB:RA]` |
+| `or*-mba` | 1 | `MEM[RB:RA] = ACC \| MEM[RB:RA]` |
+
+**Loading an address into RA/RB or RC/RD** is done with `rarb` / `rcrd`. The 8-bit immediate encodes both nibbles: the low nibble goes into the first register, and the high nibble into the second.
+
+| Instruction | Bytes | Effect |
+|---|---|---|
+| `rarb <imm>` | 2 | `RA = low nibble of imm`, `RB = high nibble of imm` |
+| `rcrd <imm>` | 2 | `RC = low nibble of imm`, `RD = high nibble of imm` |
+
+Example: `rarb 0xC3` → RA=3, RB=12, so `MEM[RB:RA]` addresses byte `0xC3` (195).
+
+### Arithmetic
+
+| Instruction | Bytes | Effect |
+|---|---|---|
+| `add-mba` | 1 | `ACC = ACC + MEM[RB:RA]`; CF = carry out |
+| `addc-mba` | 1 | `ACC = ACC + MEM[RB:RA] + CF`; CF = carry out |
+| `sub-mba` | 1 | `ACC = ACC - MEM[RB:RA]`; CF = borrow |
+| `subc-mba` | 1 | `ACC = ACC - MEM[RB:RA] + CF`; CF = borrow |
+| `inc` | 1 | `ACC = ACC + 1` |
+| `dec` | 1 | `ACC = ACC - 1` |
+| `inc*-reg <reg>` | 1 | `REG[reg] = REG[reg] + 1` |
+| `dec*-reg <reg>` | 1 | `REG[reg] = REG[reg] - 1` |
+| `add <imm>` | 2 | `ACC = ACC + imm` (imm: 0–15) |
+| `sub <imm>` | 2 | `ACC = ACC - imm` (imm: 0–15) |
+| `bcd` | 1 | If `ACC >= 10` or `CF == 1`: `ACC = ACC + 6`, `CF = 1` (BCD correction) |
+
+### Logic & Rotation
+
+| Instruction | Bytes | Effect |
+|---|---|---|
+| `and-ba` | 1 | `ACC = ACC & MEM[RB:RA]` |
+| `xor-ba` | 1 | `ACC = ACC ^ MEM[RB:RA]` |
+| `or-ba` | 1 | `ACC = ACC \| MEM[RB:RA]` |
+| `and <imm>` | 2 | `ACC = ACC & imm` (imm: 0–15) |
+| `xor <imm>` | 2 | `ACC = ACC ^ imm` (imm: 0–15) |
+| `or <imm>` | 2 | `ACC = ACC \| imm` (imm: 0–15) |
+| `rot-r` | 1 | Rotate ACC one bit right (bit 0 wraps to bit 3) |
+| `rot-l` | 1 | Rotate ACC one bit left (bit 3 wraps to bit 0) |
+| `rot-rc` | 1 | Rotate `CF:ACC` right: CF → bit 3 of ACC, bit 0 of ACC → CF |
+| `rot-lc` | 1 | Rotate `CF:ACC` left: bit 3 of ACC → CF, CF → bit 0 of ACC |
+
+### Register & ACC Operations
+
+| Instruction | Bytes | Effect |
+|---|---|---|
+| `acc <imm>` | 1 | `ACC = imm` (imm: 0–15) |
+| `to-reg <reg>` | 1 | `REG[reg] = ACC` |
+| `from-reg <reg>` | 1 | `ACC = REG[reg]` |
+| `r4 <imm>` | 2 | `RE = imm` (imm: 0–15; directly sets RE without going through ACC) |
+| `clr-cf` | 1 | `CF = 0` |
+| `set-cf` | 1 | `CF = 1` |
+
+### Control Flow
+
+Branch targets can be a numeric address or a **label name**. All branch instructions preserve the top bits of PC, keeping execution within the same memory page.
+
+| Instruction | Bytes | Branches if… |
+|---|---|---|
+| `b <imm>` | 2 | Always (unconditional jump) |
+| `call <imm>` | 2 | Always; saves `PC + 2` to TEMP first |
+| `ret` | 1 | Always; restores PC from TEMP, clears TEMP |
+| `beqz <imm>` | 2 | `ACC == 0` |
+| `bnez <imm>` | 2 | `ACC != 0` |
+| `beqz-cf <imm>` | 2 | `CF == 0` |
+| `bnez-cf <imm>` | 2 | `CF != 0` |
+| `bnz-a <imm>` | 2 | `RA != 0` |
+| `bnz-b <imm>` | 2 | `RB != 0` |
+| `bnz-d <imm>` | 2 | `RD != 0` |
+| `b-bit <k> <imm>` | 2 | Bit `k` of ACC is 1 (k: 0=LSB … 3=MSB) |
+
+### I/O & Miscellaneous
+
+| Instruction | Bytes | Effect |
+|---|---|---|
+| `from-ioa` | 1 | `ACC = IOA` (reads current button state) |
+| `nop` | 1 | No operation |
+| `shutdown` | 2 | Stops execution (closes emulator / halts hardware) |
+| `.byte <value>` | 1 | Assembler directive: places a raw byte into instruction memory |
+
+---
+
+## Setup
+
+**Requirements:** Python 3.10+, Pyxel 2.8.10, Logisim Evolution
+
+1. Clone this repository or download and extract the ZIP.
+2. Install Python dependencies:
+
+```sh
+pip install -r requirements.txt
+```
+
+or
+
+```sh
+pip3 install -r requirements.txt
+```
+
+3. Install **Logisim Evolution** (required for Part B only) from the [Logisim Evolution releases page](https://github.com/logisim-evolution/logisim-evolution/releases) based on your device.
+
+---
+
+## Part A1: Assembler
+
+Translates Arch-242 assembly (`.asm`) into binary or Logisim-compatible hex output.
+
+### How to Run
+
+From the **root directory**:
 
 ```sh
 python parta1/assembler.py <input_file.asm> <bin | hex>
 ```
-or 
 
-```sh
-python3 parta1/assembler.py <input_file.asm> <bin | hex>
-```
+The output file is written alongside the input file with the corresponding extension (e.g., `input.hex`).
 
-## Additional Features
-### Exception Handling
-The assembler provides comprehensive error reporting with line-specific feedback:
+### Supported Syntax
 
-- Line-specific errors: Shows exact line number where errors occur
-- Range validation: Validates immediate values and register numbers
-- Clear error messages: Descriptive messages help identify issues quickly
+**Labels** — define with `label_name:`, reference by name in any branch or call instruction. Forward references are supported.
 
-Example error output:
-```
-Error at line 15: Invalid register number: 7
-
-Error at line 23: Immediate value too large for add: 20
-
-Error at line 31: Unknown instruction: invalidop
-```
-
-### Label Support
-Labels can be defined and referenced throughout your assembly code:
-- Label definition: Use `label_name:` to define a label at the current address
-- Label referencing: Use the label name in branch and call instructions
-- Automatic address resolution: Labels are automatically resolved to their memory addresses during assembly
-- Forward references: Labels can be referenced before they are defined
-
-Example usage:
-```
+```asm
 main_loop:
     from-ioa
-    beqz no_input
+    beqz no_input       # branch if ACC == 0
     b process_input
 
 no_input:
     nop
     b main_loop
-
-process_input:
-    call handle_direction
-    b main_loop
 ```
 
-### Comment Support
-The assembler supports single-line comments for code documentation:
+**Comments** — `#` starts a comment to end of line (inline or full-line).
 
-- Comment syntax: Use `#` to start a comment that continues to the end of the line
-- Inline comments: Comments can be placed after instructions on the same line
-- Full-line comments: Entire lines can be comments for documentation
-- Automatic stripping: Comments are automatically removed during assembly and don't affect the generated code
+**Immediate values** — both decimal (`10`) and hex (`0xA`, `0xFF`) are accepted. Case-insensitive.
 
-Example usage:
+**`.byte` directive** — places a raw byte value directly into instruction memory:
+```asm
+.byte 0x2F
 ```
-# Main program entry point
-main_loop:
-    from-ioa          # Read input from IOA
-    beqz no_input     # Branch if no input received
-    b process_input   # Jump to input processing
 
-# Handle case when no input is available
-no_input:
-    nop              # Do nothing
-    b main_loop      # Return to main loop
+### Error Reporting
+
+Line-specific errors are reported with the offending line number:
 ```
-### Hexadecimal Immediate Values
-The assembler supports both decimal and hexadecimal immediate values:
-
-- Hex format: Use `0x` prefix for hexadecimal values (e.g., `0xFF`, `0x20`)
-- Case insensitive: Both uppercase and lowercase hex digits are supported (`0xFF` or `0xff`)
-- Mixed usage: You can mix decimal and hex values in the same program
-- Range validation: Hex values are validated against instruction-specific limits
-
-Example usage:
+Error at line 15: Invalid register number: 7
+Error at line 23: Immediate value too large for add: 20
+Error at line 31: Unknown instruction: invalidop
 ```
-acc 0xF          # Load 15 into accumulator
-rarb 0x20        # Set RA/RB to address 32
-add 0xA          # Add 10 to accumulator
-```
-## Some Notes/Assumptions
-- Since the project specifications did not specify which memory to place the `.byte` directive, the contributors assumed that it is stored in the instruction memory and is treated as instructions. This means `.byte` values are placed alongside other instructions in the program memory and will increment the program counter accordingly.
 
+### Notes / Assumptions
+- `.byte` values are placed in **instruction memory** (same address space as instructions) and increment the program counter accordingly.
 
-# Part A2: Pyxel-based Arch-242 emulator
-## How to Run
-From the root directory, run the following:
+---
+
+## Part A2: Emulator
+
+A Pyxel-based graphical emulator that executes Arch-242 programs and displays output on a 10-row × 20-column LED matrix window.
+
+### How to Run
+
+From the **root directory**, pass any `.asm` file directly — the emulator calls the assembler internally:
 
 ```sh
 python parta2/arch242.py <input_file.asm>
 ```
-or
-```sh
-python3 parta2/arch242.py <input_file.asm> 
+
+### Controls
+
+| Key | IOA bit | Action |
+|---|---|---|
+| ↑ Up | bit 0 | Move snake up |
+| ↓ Down | bit 1 | Move snake down |
+| ← Left | bit 2 | Move snake left |
+| → Right | bit 3 | Move snake right |
+
+### Debugging Mode
+
+Disabled by default. To enable, open [parta2/emulator.py](parta2/emulator.py) and set:
+
+```python
+self.debugging = True
 ```
 
-## Additional Features
-- Custom LED colors for snake game
-- Debugging Features
-    - How to use
-        - By default, this feature is off.
-        - set `self.debugging = True` in `emulator.py`
-            ```python
-            class Arch242Emulator:
-                def __init__(self, instr_hex: list[str]):
-                    ...
-                    self.debugging = True
-                    ...
-            ````
-    - When a program is ran into the emulator, it does the following:
-        - If a folder `parta2/logs`, does not exist yet. It initializes the folder.
-        - It creates a file `parta2/logs/debugging.txt` with the following contents for every instruction ran by the program by default:
-            - Current program counter
-            - Instruction ran
-            - Values at different registers
-        - To see specific values at different parts of the emulator, it can be added into the following portion of the code:
-            ```python
-            class Arch242Emulator:
-                def update(self):
-                    ...
-                    if self.debugging:
-                        with open("logs/debugging.txt", 'a') as f:
-                            ...
-                            f.write(f"<value you would like to track>")
-                            f.write(f"\n")
-                            ...
-                    ...
-            ```
-## Some Notes/Assumptions
-- Since addressability was not specified, the instruction memory and data memory were assumed to be byte-addressable memory.
-- The LED matrix is a 10-row by 20-column matrix. It follows the mapping table in the project specifications.
-- `beqz <imm>` branches when ACC is zero, and `bnez <imm>` branches when ACC is nonzero.
-# Part A3: Snake Game assembly code
-## How to Run
-To assemble the code into machine code,
-- From the root directory, run the following:
-    ```sh
-    python parta1/assembler.py <input_file.asm> <bin / hex>
-    ```
-    or 
+When enabled, every executed instruction is logged to `parta2/logs/debugging.txt` with the current PC, instruction name, ACC, CF, TEMP, registers, and IOA values.
 
-    ```sh
-    python3 parta1/assembler.py <input_file.asm> <bin / hex>
-    ```
+### Notes / Assumptions
+- Both instruction memory and data memory are treated as **byte-addressable**.
+- The LED display window is **10 rows × 20 columns**, matching the memory mapping table (addresses 192–241).
 
-To run the code using the emulator (play the snake game),
-- From the root directory, run the following:
-    ```sh
-    python parta2/arch242.py parta3/snake.asm
-    ```
-    or
-    ```sh
-    python3 parta2/arch242.py parta3/snake.asm
-    ```
+---
 
-Note: The emulator uses the assembler to assemble into a list of hex strings.
+## Part A3: Snake Game
 
-## Some Notes/Assumptions
-- When restarting the game, the snake respawns and follows the most recent direction.
-- Using a direction that goes toward the snake will result into a self collision, e.g. when the snake is moving to the right, pressing the left key will cause your snake to die and the game will restart.
+A Snake game written entirely in Arch-242 assembly, playable in the emulator.
 
-# Part B: Logisim-based Arch-242 implementation
-## How to Run
+### How to Play
 
-1. Open `Arch242.circ` in Logisim Evolution.
-2. Click the **InstrMem** Circuit 
-    1. Right Click the ROM 
-    2. **Load Image → Hex**
-    3. Select your `.hex` file
-    4. Start the simulation.
+```sh
+python parta2/arch242.py parta3/snake.asm
+```
 
-A `.hex` file can be made from your `.asm` file containing your Arch242 Assembly Code using the assembler. Run the following in the terminal:
+- Use the **arrow keys** to steer the snake.
+- Eat food to grow and increase your score (max score: 15).
+- The game restarts automatically when the snake hits a wall or itself.
+
+### Game Rules
+- Snake starts with length 3 and moves every game tick.
+- Score starts at 0 and increments each time food is eaten.
+- Score display is shown on the LED matrix alongside the game grid.
+
+### Notes / Assumptions
+- On restart, the snake respawns and continues moving in the **most recent direction**.
+- Pressing the key **opposite** to the current direction is treated as a self-collision and triggers a restart (e.g., pressing Left while moving Right).
+
+---
+
+## Part B: Logisim Hardware Implementation
+
+A Logisim Evolution circuit that implements the Arch-242 processor in hardware.
+
+### How to Run
+
+1. Open `partb/Arch242.circ` in **Logisim Evolution**.
+2. Navigate to the **InstrMem** subcircuit.
+3. Right-click the ROM component → **Load Image → Hex**.
+4. Select the `.hex` file generated by the assembler.
+5. Start the simulation.
+
+To generate a `.hex` file from assembly:
+
 ```sh
 python parta1/assembler.py <input_file.asm> hex
 ```
-After running, a `.hex` file will be created on the same location as your `.asm` file, which you can load into the Logisim-based hardware.
 
-## Some Notes/Assumptions
-- Since addressability was not specified, the instruction memory was assumed to be byte-addressable and data memory was assumed to be nibble-addressable memory.
-- `beqz <imm>` branches when ACC is zero, and `bnez <imm>` branches when ACC is nonzero.
+The `.hex` output is placed in the same directory as the input `.asm` file.
+
+### Notes / Assumptions
+- Instruction memory is **byte-addressable**; data memory is **nibble-addressable**.
+- The LED matrix and IOA input buttons are not implemented in the hardware.
