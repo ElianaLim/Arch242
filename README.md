@@ -42,6 +42,8 @@ Data memory addresses **192–241** are memory-mapped to a **10-row × 20-column
 | … | … | … |
 | 241 | bits 0–3 | Row 9, Columns 16–19 |
 
+![LED Matrix MMIO](assets/led_matrix_layout.png)
+
 ---
 
 ## Instruction Set Reference
@@ -262,6 +264,8 @@ When enabled, every executed instruction is logged to `parta2/logs/debugging.txt
 ## Part A3: Snake Game
 
 A Snake game written entirely in Arch-242 assembly, playable in the emulator.
+
+![Snake game screenshot](assets/snake.png)
 
 ### How to Play
 
