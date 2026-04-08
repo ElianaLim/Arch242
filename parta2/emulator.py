@@ -59,10 +59,10 @@ class Arch242Emulator:
         self.running = True
         self.debugging = False
         if self.debugging:
-            folder = "logs"
-            file_path = os.path.join(folder, "output.txt")
+            folder = os.path.abspath("parta2/logs")
             os.makedirs(folder, exist_ok=True)
-            open("logs/debugging.txt", 'w').close()
+            file_path = os.path.join(folder, "debugging.txt")
+            open(file_path, 'w').close()
         pyxel.init(CELL_DIM * NUM_COLS, CELL_DIM * NUM_ROWS, title="Arch242 Emulator", fps=2000)
         pyxel.run(self.update, self.draw)
 
@@ -75,24 +75,11 @@ class Arch242Emulator:
             self.process_instruction(self.instr_mem[self.pc])
             if self.debugging:
                 with open("logs/debugging.txt", 'a') as f:
-                    f.write(f"score: {self.data_mem[0xf3]}\n")
-                    f.write(f"food position: row={self.data_mem[0xf4]} and col={self.data_mem[0xf5]}\n")
-                    f.write(f"address {self.reg[1] << 2 | self.reg[0]} MEM[RB:RA] = {self.data_mem[self.reg[1] << 2 | self.reg[0]]}\n")
                     f.write(f"acc: {self.acc}\n")
                     f.write(f"cf: {self.cf}\n")
                     f.write(f"temp: {self.temp}\n")
                     f.write(f"registers: {self.reg}\n")
-                    f.write(f"direction): {self.data_mem[0xf2]}\n")
                     f.write(F"ioa: {self.ioa}\n")
-                    f.write(f"length: {self.data_mem[0x00]}\n")
-                    f.write(f"head position: r: {self.data_mem[0x01]}, c: {self.data_mem[0x02]}\n")
-                    f.write(f"tail pointer r: 0x{self.data_mem[0xfe]}{self.data_mem[0xff]}\n")
-                    f.write(f"tail pointer c: 0x{self.data_mem[0xfc]}{self.data_mem[0xfd]}\n")
-                    f.write(f"0x35: {self.data_mem[0x35]}\n")
-                    f.write(f"0x36: {self.data_mem[0x36]}\n")
-                    f.write(f"0x34: {self.data_mem[0x34]}\n")
-                    f.write(f"217: {self.data_mem[0xd9]}\n")
-                    f.write(f"218: {self.data_mem[0xda]}\n")
                     
                     f.write(f"\n")
 
