@@ -292,7 +292,7 @@ python parta2/arch242.py parta3/snake.asm
 
 A Logisim Evolution circuit that implements the Arch-242 processor in hardware.
 
-! [Physical Circuit Overview](assets/physical_circuit.png)
+![Physical Circuit Overview](assets/physical_circuit.png)
 
 ### How to Run
 
